@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业员工管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --light-color: #ecf0f1;
+        }
+
+        .input-group-text {
+            background-color: var(--light-color);
+            border-color: #dee2e6;
+        }
+
+        .form-select:focus, .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+
+        .table th {
+            background-color: var(--light-color);
+        }
+
+        .sidebar {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar .nav-link {
+            color: var(--secondary-color);
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .stat-card .label {
+            font-size: 1rem;
+            color: var(--secondary-color);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+
+        .action-btn {
+            margin: 0 3px;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+
+        /* 🆕 新增用户信息样式 */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-bottom: 20px;
+            }
+
+            .user-info {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 🆕 登录检查加载状态 -->
+    <div v-if="checkingAuth" class="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">检查登录状态...</span>
+        </div>
+    </div>
+
+    <!-- 🆕 未登录状态显示 -->
+    <div v-else-if="!isLoggedIn" class="loading">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <p>未登录，正在跳转到登录页面...</p>
+        </div>
+    </div>
+
+    <!-- 已登录状态显示主内容 -->
+    <div v-else>
+        <!-- 导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-building me-2"></i>企业员工管理系统
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <!-- 🆕 用户信息和登出按钮 -->
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <span>欢迎，{{ userInfo.username }}</span>
+                        <span class="badge bg-light text-dark">{{ userInfo.role === 'ADMIN' ? '管理员' : '用户' }}</span>
+                        <button class="logout-btn" @click="handleLogout">
+                            <i class="fas fa-sign-out-alt me-1"></i>退出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <div class="row">
+                <!-- 侧边栏 -->
+                <div class="col-lg-3 mb-4">
+                    <div class="sidebar p-3">
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#" @click="switchTab('dashboard')">
+                                    <i class="fas fa-tachometer-alt me-2"></i>仪表板
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" @click="switchTab('dept')">
+                                    <i class="fas fa-sitemap me-2"></i>部门管理
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" @click="switchTab('emp')">
+                                    <i class="fas fa-users me-2"></i>员工管理
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="analysis.html">
+                                    <i class="fas fa-chart-line me-2"></i>薪资分析
+                                </a>
+                            </li>
+                            <!-- 🆕 管理员专属菜单 -->
+                            <li class="nav-item" v-if="userInfo.role === 'ADMIN'">
+                                <a class="nav-link" href="#" @click="switchTab('admin')">
+                                    <i class="fas fa-cog me-2"></i>系统管理
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <div class="card mt-4">
+                        <div class="card-body">
+                            <h5 class="card-title">系统统计</h5>
+                            <div class="row text-center mt-3">
+                                <div class="col-6">
+                                    <div class="stat-card">
+                                        <div class="number">{{ depts.length }}</div>
+                                        <div class="label">部门数量</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stat-card">
+                                        <div class="number">{{ emps.length }}</div>
+                                        <div class="label">员工数量</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主内容区 -->
+                <div class="col-lg-9">
+                    <!-- 仪表板 -->
+                    <div v-if="activeTab === 'dashboard'">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">系统概览</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>最近部门</h6>
+                                        <ul class="list-group">
+                                            <li v-for="dept in depts.slice(0, 5)" :key="dept.id" class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ dept.name }}
+                                                <span class="badge bg-primary rounded-pill">{{ getEmpCountByDept(dept.id) }}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>最近员工</h6>
+                                        <ul class="list-group">
+                                            <li v-for="emp in emps.slice(0, 5)" :key="emp.id" class="list-group-item d-flex justify-content-between align-items-center">
+                                                {{ emp.name }}
+                                                <span class="badge bg-secondary rounded-pill">{{ emp.position }}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0">部门分布</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="deptChart" width="400" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0">职位分布</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="positionChart" width="400" height="200"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 部门管理 -->
+                    <div v-if="activeTab === 'dept'">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">部门管理</h5>
+                                <button class="btn btn-success btn-sm" @click="showAddDeptModal">
+                                    <i class="fas fa-plus me-1"></i>新增部门
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <!-- 部门查询表单 -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" class="form-control" placeholder="输入部门名称搜索..." v-model="deptSearchKeyword">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-outline-secondary w-100" @click="resetDeptSearch">
+                                            <i class="fas fa-refresh me-1"></i>重置
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <small class="text-muted">共 {{ filteredDepts.length }} 个部门</small>
+                                    </div>
+                                </div>
+
+                                <div v-if="loadingDepts" class="loading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <div v-else class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>部门名称</th>
+                                            <th>负责人</th>
+                                            <th>办公地点</th>
+                                            <th>创建时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr v-for="dept in filteredDepts" :key="dept.id">
+                                            <td>{{ dept.id }}</td>
+                                            <td>{{ dept.name }}</td>
+                                            <td>{{ dept.manager }}</td>
+                                            <td>{{ dept.location }}</td>
+                                            <td>{{ formatDate(dept.createdTime) }}</td>
+                                            <td>
+                                                <button class="btn btn-primary btn-sm action-btn" @click="showEditDeptModal(dept)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm action-btn" @click="deleteDept(dept.id)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                    <div v-if="filteredDepts.length === 0" class="text-center py-4">
+                                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">暂无部门数据</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 员工管理 -->
+                    <div v-if="activeTab === 'emp'">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">员工管理</h5>
+                                <button class="btn btn-success btn-sm" @click="showAddEmpModal">
+                                    <i class="fas fa-plus me-1"></i>新增员工
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <!-- 员工查询表单 -->
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                            <input type="text" class="form-control" placeholder="员工姓名或ID" v-model="empSearchKeyword">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" v-model="empSearchDept">
+                                            <option value="">所有部门</option>
+                                            <option v-for="dept in depts" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" v-model="empSearchPosition">
+                                            <option value="">所有职位</option>
+                                            <option value="经理">经理</option>
+                                            <option value="工程师">工程师</option>
+                                            <option value="销售">销售</option>
+                                            <option value="人事">人事</option>
+                                            <option value="财务">财务</option>
+                                            <option value="市场专员">市场专员</option>
+                                            <option value="会计">会计</option>
+                                            <option value="主管">主管</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-outline-secondary w-100" @click="resetEmpSearch">
+                                            <i class="fas fa-refresh me-1"></i>重置
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div v-if="loadingEmps" class="loading">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </div>
+                                <div v-else class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>姓名</th>
+                                            <th>性别</th>
+                                            <th>年龄</th>
+                                            <th>职位</th>
+                                            <th>薪资</th>
+                                            <th>部门</th>
+                                            <th>操作</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <tr v-for="emp in filteredEmps" :key="emp.id">
+                                            <td>{{ emp.id }}</td>
+                                            <td>{{ emp.name }}</td>
+                                            <td>{{ emp.gender }}</td>
+                                            <td>{{ emp.age }}</td>
+                                            <td>{{ emp.position }}</td>
+                                            <td>¥{{ emp.salary }}</td>
+                                            <td>{{ getDeptName(emp.departmentId) }}</td>
+                                            <td>
+                                                <button class="btn btn-primary btn-sm action-btn" @click="showEditEmpModal(emp)">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm action-btn" @click="deleteEmp(emp.id)">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                    <div v-if="filteredEmps.length === 0" class="text-center py-4">
+                                        <i class="fas fa-users-slash fa-3x text-muted mb-3"></i>
+                                        <p class="text-muted">暂无员工数据</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🆕 系统管理（管理员专属） -->
+                    <div v-if="activeTab === 'admin' && userInfo.role === 'ADMIN'">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">系统管理</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-users-cog fa-3x text-primary mb-3"></i>
+                                                <h5>用户管理</h5>
+                                                <p class="text-muted">管理系统用户和权限</p>
+                                                <button class="btn btn-outline-primary">管理用户</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-chart-bar fa-3x text-success mb-3"></i>
+                                                <h5>系统监控</h5>
+                                                <p class="text-muted">查看系统运行状态</p>
+                                                <button class="btn btn-outline-success">查看监控</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 部门模态框 -->
+        <div class="modal fade" id="deptModal" tabindex="-1" aria-labelledby="deptModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deptModalLabel">{{ isEditDept ? '编辑部门' : '新增部门' }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form>
+                            <div class="mb-3">
+                                <label for="deptName" class="form-label">部门名称</label>
+                                <input type="text" class="form-control" id="deptName" v-model="currentDept.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="manager" class="form-label">负责人</label>
+                                <input type="text" class="form-control" id="manager" v-model="currentDept.manager" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="location" class="form-label">办公地点</label>
+                                <input type="text" class="form-control" id="location" v-model="currentDept.location" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" @click="saveDept">{{ isEditDept ? '更新' : '添加' }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 员工模态框 -->
+        <div class="modal fade" id="empModal" tabindex="-1" aria-labelledby="empModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="empModalLabel">{{ isEditEmp ? '编辑员工' : '新增员工' }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form>
+                            <div class="mb-3">
+                                <label for="empName" class="form-label">姓名</label>
+                                <input type="text" class="form-control" id="empName" v-model="currentEmp.name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="gender" class="form-label">性别</label>
+                                <select class="form-select" id="gender" v-model="currentEmp.gender" required>
+                                    <option value="">请选择</option>
+                                    <option value="男">男</option>
+                                    <option value="女">女</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="age" class="form-label">年龄</label>
+                                <input type="number" class="form-control" id="age" v-model="currentEmp.age" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="position" class="form-label">职位</label>
+                                <input type="text" class="form-control" id="position" v-model="currentEmp.position" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="salary" class="form-label">薪资</label>
+                                <input type="number" class="form-control" id="salary" v-model="currentEmp.salary" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="department" class="form-label">部门</label>
+                                <select class="form-select" id="department" v-model="currentEmp.departmentId" required>
+                                    <option value="">请选择部门</option>
+                                    <option v-for="dept in depts" :key="dept.id" :value="dept.id">{{ dept.name }}</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label">邮箱</label>
+                                <input type="email" class="form-control" id="email" v-model="currentEmp.email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="hireDate" class="form-label">入职日期</label>
+                                <input type="date" class="form-control" id="hireDate" v-model="currentEmp.hireDate" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" @click="saveEmp">{{ isEditEmp ? '更新' : '添加' }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="auth.js"></script>
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                // 🆕 新增认证相关数据
+                checkingAuth: true,
+                isLoggedIn: false,
+                userInfo: {
+                    username: '',
+                    role: ''
+                },
+
+                // 原有数据保持不变
+                activeTab: 'dashboard',
+                depts: [],
+                emps: [],
+                loadingDepts: false,
+                loadingEmps: false,
+                isEditDept: false,
+                isEditEmp: false,
+                deptSearchKeyword: '',
+                empSearchKeyword: '',
+                empSearchDept: '',
+                empSearchPosition: '',
+                currentDept: {
+                    id: null,
+                    name: '',
+                    manager: '',
+                    location: '',
+                    createdTime: null
+                },
+                currentEmp: {
+                    id: null,
+                    name: '',
+                    gender: '',
+                    age: null,
+                    position: '',
+                    salary: null,
+                    departmentId: null,
+                    email: '',
+                    hireDate: null,
+                    createTime: null
+                }
+            }
+        },
+        computed: {
+            // 原有computed保持不变
+            filteredDepts() {
+                if (!this.deptSearchKeyword) {
+                    return this.depts;
+                }
+                const keyword = this.deptSearchKeyword.toLowerCase();
+                return this.depts.filter(dept =>
+                    dept.name.toLowerCase().includes(keyword) ||
+                    (dept.manager && dept.manager.toLowerCase().includes(keyword)) ||
+                    (dept.location && dept.location.toLowerCase().includes(keyword))
+                );
+            },
+            filteredEmps() {
+                let filtered = this.emps;
+                if (this.empSearchKeyword) {
+                    const keyword = this.empSearchKeyword.toLowerCase();
+                    filtered = filtered.filter(emp =>
+                        emp.name.toLowerCase().includes(keyword) ||
+                        emp.id.toString().includes(keyword)
+                    );
+                }
+                if (this.empSearchDept) {
+                    filtered = filtered.filter(emp => emp.departmentId == this.empSearchDept);
+                }
+                if (this.empSearchPosition) {
+                    filtered = filtered.filter(emp => emp.position === this.empSearchPosition);
+                }
+                return filtered;
+            }
+        },
+        async mounted() {
+            // 🆕 首先检查登录状态
+            await this.checkAuthentication();
+
+            // 如果已登录，再加载数据
+            if (this.isLoggedIn) {
+                console.log('应用已挂载，用户已登录');
+                this.loadDepts();
+                this.loadEmps();
+            }
+        },
+        methods: {
+            // 🆕 修改认证检查方法
+            async checkAuthentication() {
+                this.checkingAuth = true;
+
+                console.log('开始认证检查...');
+                console.log('localStorage token:', localStorage.getItem('token'));
+                console.log('localStorage userInfo:', localStorage.getItem('userInfo'));
+
+                // 🆕 简化检查：只看是否有token，不验证有效性（暂时）
+                if (auth.isLoggedIn()) {
+                    console.log('检测到token，认为已登录');
+                    this.isLoggedIn = true;
+                    this.userInfo = auth.getUserInfo();
+                    console.log('用户信息:', this.userInfo);
+                } else {
+                    console.log('未检测到token，跳转到登录页');
+                    // 🆕 添加延迟让用户看到提示
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 1000);
+                }
+
+                this.checkingAuth = false;
+            },
+
+            // 🆕 处理登出
+            handleLogout() {
+                if (confirm('确定要退出登录吗？')) {
+                    auth.logout();
+                }
+            },
+
+            // 原有方法保持不变
+            switchTab(tab) {
+                console.log('switchTab 被调用:', tab);
+                this.activeTab = tab;
+                if (tab === 'dashboard') {
+                    this.$nextTick(() => {
+                        this.initCharts();
+                    });
+                }
+            },
+            async loadDepts() {
+                console.log('loadDepts 被调用');
+                this.loadingDepts = true;
+                try {
+                    const response = await axios.get('/api/depts');
+                    this.depts = response.data.data;
+                    console.log('部门数据加载成功:', this.depts.length);
+                } catch (error) {
+                    console.error('加载部门数据失败:', error);
+                    alert('加载部门数据失败，请检查网络连接或后端服务');
+                } finally {
+                    this.loadingDepts = false;
+                }
+            },
+            async loadEmps() {
+                console.log('loadEmps 被调用');
+                this.loadingEmps = true;
+                try {
+                    const response = await axios.get('/api/emps');
+                    this.emps = response.data.data;
+                    console.log('员工数据加载成功:', this.emps.length);
+                } catch (error) {
+                    console.error('加载员工数据失败:', error);
+                    alert('加载员工数据失败，请检查网络连接或后端服务');
+                } finally {
+                    this.loadingEmps = false;
+                }
+            },
+            showAddDeptModal() {
+                console.log('showAddDeptModal 被调用');
+                this.isEditDept = false;
+                this.currentDept = {
+                    id: null,
+                    name: '',
+                    manager: '',
+                    location: '',
+                    createdTime: null
+                };
+                const modal = new bootstrap.Modal(document.getElementById('deptModal'));
+                modal.show();
+            },
+            showEditDeptModal(dept) {
+                console.log('showEditDeptModal 被调用:', dept);
+                this.isEditDept = true;
+                this.currentDept = { ...dept };
+                const modal = new bootstrap.Modal(document.getElementById('deptModal'));
+                modal.show();
+            },
+            async saveDept() {
+                console.log('saveDept 被调用');
+                try {
+                    if (this.isEditDept) {
+                        console.log('更新部门:', this.currentDept);
+                        await axios.put('/api/depts', this.currentDept);
+                    } else {
+                        console.log('新增部门:', this.currentDept);
+                        this.currentDept.createdTime = new Date().toISOString();
+                        await axios.post('/api/depts', this.currentDept);
+                    }
+                    await this.loadDepts();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('deptModal'));
+                    modal.hide();
+                    alert('部门保存成功');
+                } catch (error) {
+                    console.error('保存部门失败:', error);
+                    alert('保存部门失败，请检查数据格式或网络连接');
+                }
+            },
+            async deleteDept(id) {
+                console.log('deleteDept 被调用:', id);
+                if (confirm('确定要删除这个部门吗？')) {
+                    try {
+                        await axios.delete(`/api/depts/${id}`);
+                        await this.loadDepts();
+                        alert('部门删除成功');
+                    } catch (error) {
+                        console.error('删除部门失败:', error);
+                        alert('删除部门失败，请检查网络连接');
+                    }
+                }
+            },
+            resetDeptSearch() {
+                console.log('resetDeptSearch 被调用');
+                this.deptSearchKeyword = '';
+            },
+            showAddEmpModal() {
+                console.log('showAddEmpModal 被调用');
+                this.isEditEmp = false;
+                this.currentEmp = {
+                    id: null,
+                    name: '',
+                    gender: '',
+                    age: null,
+                    position: '',
+                    salary: null,
+                    departmentId: null,
+                    email: '',
+                    hireDate: null,
+                    createTime: null
+                };
+                const modal = new bootstrap.Modal(document.getElementById('empModal'));
+                modal.show();
+            },
+            showEditEmpModal(emp) {
+                console.log('showEditEmpModal 被调用:', emp);
+                this.isEditEmp = true;
+                this.currentEmp = {
+                    id: emp.id,
+                    name: emp.name || '',
+                    gender: emp.gender || '',
+                    age: emp.age ? Number(emp.age) : null,
+                    position: emp.position || '',
+                    salary: emp.salary ? Number(emp.salary) : null,
+                    departmentId: emp.departmentId ? Number(emp.departmentId) : null,
+                    email: emp.email || '',
+                    hireDate: this.formatDateForInput(emp.hireDate),
+                    createTime: emp.createTime
+                };
+                const modal = new bootstrap.Modal(document.getElementById('empModal'));
+                modal.show();
+            },
+            async saveEmp() {
+                console.log('saveEmp 被调用');
+                try {
+                    const empData = {
+                        id: this.currentEmp.id,
+                        name: this.currentEmp.name,
+                        gender: this.currentEmp.gender,
+                        age: Number(this.currentEmp.age),
+                        position: this.currentEmp.position,
+                        salary: Number(this.currentEmp.salary),
+                        departmentId: Number(this.currentEmp.departmentId),
+                        email: this.currentEmp.email,
+                        hireDate: this.currentEmp.hireDate ? `${this.currentEmp.hireDate}T00:00:00` : null,
+                        createTime: this.currentEmp.createTime
+                    };
+                    console.log('发送的员工数据:', empData);
+                    if (this.isEditEmp) {
+                        await axios.put('/api/emps', empData);
+                    } else {
+                        empData.createTime = new Date().toISOString();
+                        await axios.post('/api/emps', empData);
+                    }
+                    await this.loadEmps();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('empModal'));
+                    modal.hide();
+                    alert('员工保存成功');
+                } catch (error) {
+                    console.error('保存员工失败:', error);
+                    alert('保存员工失败: ' + (error.response?.data?.message || error.message));
+                }
+            },
+            async deleteEmp(id) {
+                console.log('deleteEmp 被调用:', id);
+                if (confirm('确定要删除这个员工吗？')) {
+                    try {
+                        await axios.delete(`/api/emps/${id}`);
+                        await this.loadEmps();
+                        alert('员工删除成功');
+                    } catch (error) {
+                        console.error('删除员工失败:', error);
+                        alert('删除员工失败，请检查网络连接');
+                    }
+                }
+            },
+            resetEmpSearch() {
+                console.log('resetEmpSearch 被调用');
+                this.empSearchKeyword = '';
+                this.empSearchDept = '';
+                this.empSearchPosition = '';
+            },
+            getDeptName(deptId) {
+                console.log('getDeptName 被调用:', deptId);
+                const dept = this.depts.find(d => d.id === deptId);
+                return dept ? dept.name : '未知部门';
+            },
+            getEmpCountByDept(deptId) {
+                console.log('getEmpCountByDept 被调用:', deptId);
+                return this.emps.filter(emp => emp.departmentId === deptId).length;
+            },
+            formatDate(dateString) {
+                console.log('formatDate 被调用:', dateString);
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('zh-CN') + ' ' + date.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+                } catch (e) {
+                    return dateString;
+                }
+            },
+            formatDateForInput(dateString) {
+                console.log('formatDateForInput 被调用:', dateString);
+                if (!dateString) return '';
+                try {
+                    let date;
+                    if (typeof dateString === 'string') {
+                        if (dateString.includes('T')) {
+                            date = new Date(dateString);
+                        } else if (dateString.includes(' ')) {
+                            date = new Date(dateString.replace(' ', 'T'));
+                        } else {
+                            date = new Date(dateString);
+                        }
+                    } else {
+                        date = new Date(dateString);
+                    }
+                    if (isNaN(date.getTime())) {
+                        return '';
+                    }
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                } catch (e) {
+                    console.error('日期格式化错误:', e);
+                    return '';
+                }
+            },
+            initCharts() {
+                console.log('initCharts 被调用');
+                const deptCtx = document.getElementById('deptChart');
+                if (deptCtx) {
+                    new Chart(deptCtx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: this.depts.map(dept => dept.name),
+                            datasets: [{
+                                label: '员工数量',
+                                data: this.depts.map(dept => this.getEmpCountByDept(dept.id)),
+                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                                borderColor: 'rgba(52, 152, 219, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+                const positionCtx = document.getElementById('positionChart');
+                if (positionCtx) {
+                    const positions = [...new Set(this.emps.map(emp => emp.position))];
+                    const positionCounts = positions.map(pos =>
+                        this.emps.filter(emp => emp.position === pos).length
+                    );
+                    new Chart(positionCtx.getContext('2d'), {
+                        type: 'pie',
+                        data: {
+                            labels: positions,
+                            datasets: [{
+                                data: positionCounts,
+                                backgroundColor: [
+                                    'rgba(52, 152, 219, 0.7)',
+                                    'rgba(46, 204, 113, 0.7)',
+                                    'rgba(155, 89, 182, 0.7)',
+                                    'rgba(241, 196, 15, 0.7)',
+                                    'rgba(230, 126, 34, 0.7)'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true
+                        }
+                    });
+                }
+            }
+        },
+        watch: {
+            depts() {
+                if (this.activeTab === 'dashboard') {
+                    this.$nextTick(() => {
+                        this.initCharts();
+                    });
+                }
+            },
+            emps() {
+                if (this.activeTab === 'dashboard') {
+                    this.$nextTick(() => {
+                        this.initCharts();
+                    });
+                }
+            }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

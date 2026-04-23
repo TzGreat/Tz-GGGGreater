@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>部门薪资分析 - 企业员工管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --info-color: #17a2b8;
+            --light-color: #ecf0f1;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            margin-bottom: 20px;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .salary-high { color: var(--success-color); }
+        .salary-medium { color: var(--warning-color); }
+        .salary-low { color: var(--danger-color); }
+
+        .progress {
+            height: 8px;
+            margin-top: 5px;
+        }
+
+        .department-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .department-card:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .back-btn {
+            background: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .back-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* 🆕 新增用户信息样式 */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* 🆕 认证检查样式 */
+        .auth-checking {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .auth-checking .spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 🆕 登录检查加载状态 -->
+    <div v-if="checkingAuth" class="auth-checking">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">检查登录状态...</span>
+        </div>
+        <p class="mt-3">检查登录状态...</p>
+    </div>
+
+    <!-- 🆕 未登录状态显示 -->
+    <div v-else-if="!isLoggedIn" class="auth-checking">
+        <div class="spinner-border text-primary mb-3" role="status"></div>
+        <p>未登录，正在跳转到登录页面...</p>
+    </div>
+
+    <!-- 已登录状态显示主内容 -->
+    <div v-else>
+        <!-- 导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="index.html">
+                    <i class="fas fa-building me-2"></i>企业员工管理系统
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <!-- 🆕 用户信息和登出按钮 -->
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <span>欢迎，{{ userInfo.username }}</span>
+                        <span class="badge bg-light text-dark">{{ userInfo.role === 'ADMIN' ? '管理员' : '用户' }}</span>
+                        <button class="logout-btn" @click="handleLogout">
+                            <i class="fas fa-sign-out-alt me-1"></i>退出
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- 返回按钮 -->
+            <a href="index.html" class="back-btn">
+                <i class="fas fa-arrow-left"></i> 返回主页面
+            </a>
+
+            <!-- 总体统计 -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="number salary-high">{{ formatCurrency(totalStats.avgSalary) }}</div>
+                        <div class="label">公司平均薪资</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="number">{{ totalStats.totalEmployees }}</div>
+                        <div class="label">总员工数</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="number salary-high">{{ formatCurrency(totalStats.maxDeptSalary) }}</div>
+                        <div class="label">最高部门平均薪资</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card">
+                        <div class="number salary-low">{{ formatCurrency(totalStats.minDeptSalary) }}</div>
+                        <div class="label">最低部门平均薪资</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 部门列表视图 -->
+            <div v-if="!selectedDept">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">各部门薪资分析</h5>
+                        <div class="d-flex align-items-center">
+                            <div class="input-group" style="width: 300px;">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" placeholder="搜索部门..." v-model="searchKeyword">
+                            </div>
+                            <!-- 🆕 刷新数据按钮 -->
+                            <button class="btn btn-outline-light btn-sm ms-2" @click="loadDepartments" title="刷新数据">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div v-if="loading" class="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                        </div>
+                        <div v-else class="row">
+                            <div v-for="dept in filteredDepartments" :key="dept.deptId" class="col-md-6 col-lg-4 mb-3">
+                                <div class="card department-card" @click="selectDepartment(dept)">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ dept.deptName }}</h6>
+                                        <div class="mb-2">
+                                            <small class="text-muted">负责人: {{ dept.manager }}</small>
+                                        </div>
+                                        <div class="row text-center">
+                                            <div class="col-4">
+                                                <div class="number">{{ dept.employeeCount }}</div>
+                                                <div class="label">人数</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="number salary-high">{{ formatCurrency(dept.avgSalary) }}</div>
+                                                <div class="label">平均薪资</div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="number salary-high">{{ formatCurrency(dept.totalSalary) }}</div>
+                                                <div class="label">总薪资</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">薪资范围: {{ formatCurrency(dept.minSalary) }} - {{ formatCurrency(dept.maxSalary) }}</small>
+                                        </div>
+                                        <!-- 🆕 管理员操作按钮 -->
+                                        <div v-if="userInfo.role === 'ADMIN'" class="mt-3 pt-2 border-top">
+                                            <small class="text-muted">
+                                                <i class="fas fa-cog me-1"></i>管理员视图
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="!loading && filteredDepartments.length === 0" class="text-center py-4">
+                            <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">暂无部门数据</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表分析 -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">部门平均薪资对比</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="salaryChart" width="400" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">部门人数分布</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="employeeChart" width="400" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 部门详情视图 -->
+            <div v-if="selectedDept">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">{{ selectedDept.deptName }} - 薪资详细分析</h5>
+                        <div>
+                            <!-- 🆕 管理员操作提示 -->
+                            <span v-if="userInfo.role === 'ADMIN'" class="badge bg-warning me-2">管理员模式</span>
+                            <button class="btn btn-outline-secondary btn-sm" @click="selectedDept = null">
+                                <i class="fas fa-arrow-left me-1"></i>返回列表
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 基本信息 -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="number">{{ selectedDept.employeeCount }}</div>
+                                    <div class="label">员工总数</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="number salary-high">{{ formatCurrency(selectedDept.avgSalary) }}</div>
+                                    <div class="label">平均薪资</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="number salary-high">{{ formatCurrency(selectedDept.maxSalary) }}</div>
+                                    <div class="label">最高薪资</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="number salary-low">{{ formatCurrency(selectedDept.minSalary) }}</div>
+                                    <div class="label">最低薪资</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 薪资分布 -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">薪资分布统计</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div v-for="(count, range) in salaryRanges" :key="range" class="mb-3">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>{{ range }}</span>
+                                                <span>{{ count }}人 ({{ getSalaryRatio(count, selectedDept.employeeCount) }}%)</span>
+                                            </div>
+                                            <div class="progress">
+                                                <div class="progress-bar"
+                                                     :class="getProgressBarClass(range)"
+                                                     :style="{ width: getSalaryRatio(count, selectedDept.employeeCount) + '%' }">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="card-title mb-0">薪资分布图表</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <canvas id="detailChart" width="400" height="250"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🆕 管理员额外信息 -->
+                        <div v-if="userInfo.role === 'ADMIN'" class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-shield-alt me-2"></i>管理员信息
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <strong>部门ID:</strong> {{ selectedDept.deptId }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>办公地点:</strong> {{ selectedDept.location }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                <strong>数据更新时间:</strong> {{ new Date().toLocaleString() }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                // 🆕 新增认证相关数据
+                checkingAuth: true,
+                isLoggedIn: false,
+                userInfo: {
+                    username: '',
+                    role: ''
+                },
+
+                // 原有数据
+                departments: [],
+                selectedDept: null,
+                loading: false,
+                searchKeyword: '',
+                salaryChart: null,
+                employeeChart: null,
+                detailChart: null
+            }
+        },
+        computed: {
+            filteredDepartments() {
+                if (!this.searchKeyword) {
+                    return this.departments;
+                }
+                const keyword = this.searchKeyword.toLowerCase();
+                return this.departments.filter(dept =>
+                    dept.deptName.toLowerCase().includes(keyword) ||
+                    (dept.manager && dept.manager.toLowerCase().includes(keyword))
+                );
+            },
+            totalStats() {
+                if (this.departments.length === 0) {
+                    return { avgSalary: 0, totalEmployees: 0, maxDeptSalary: 0, minDeptSalary: 0 };
+                }
+
+                const totalEmployees = this.departments.reduce((sum, dept) => sum + dept.employeeCount, 0);
+                const totalSalary = this.departments.reduce((sum, dept) => sum + dept.totalSalary, 0);
+                const avgSalary = totalEmployees > 0 ? totalSalary / totalEmployees : 0;
+                const maxDeptSalary = Math.max(...this.departments.map(dept => dept.avgSalary));
+                const minDeptSalary = Math.min(...this.departments.map(dept => dept.avgSalary));
+
+                return {
+                    avgSalary,
+                    totalEmployees,
+                    maxDeptSalary,
+                    minDeptSalary
+                };
+            },
+            salaryRanges() {
+                if (!this.selectedDept) return {};
+                return {
+                    '低薪资 (<5,000)': this.selectedDept.lowSalaryCount,
+                    '中等薪资 (5,000-9,999)': this.selectedDept.mediumSalaryCount,
+                    '高薪资 (10,000-19,999)': this.selectedDept.highSalaryCount,
+                    '极高薪资 (≥20,000)': this.selectedDept.veryHighSalaryCount
+                };
+            }
+        },
+        async mounted() {
+            // 🆕 首先检查登录状态
+            await this.checkAuthentication();
+
+            // 如果已登录，再加载数据
+            if (this.isLoggedIn) {
+                await this.loadDepartments();
+            }
+        },
+        methods: {
+            // 🆕 新增认证相关方法
+            async checkAuthentication() {
+                this.checkingAuth = true;
+
+                console.log('analysis.html - 认证检查开始');
+                console.log('Token存在:', auth.isLoggedIn());
+                console.log('用户信息:', auth.getUserInfo());
+
+                // 🆕 直接检查localStorage，不进行网络验证
+                if (auth.isLoggedIn()) {
+                    this.isLoggedIn = true;
+                    this.userInfo = auth.getUserInfo();
+                    console.log('✅ analysis.html - 认证通过');
+                } else {
+                    console.log('❌ analysis.html - 未登录，跳转到登录页');
+                    window.location.href = 'login.html';
+                    return; // 🆕 立即返回，避免后续代码执行
+                }
+
+                this.checkingAuth = false;
+            },
+
+            // 🆕 处理登出
+            handleLogout() {
+                if (confirm('确定要退出登录吗？')) {
+                    auth.logout();
+                }
+            },
+
+            // 原有方法
+            async loadDepartments() {
+                this.loading = true;
+                try {
+                    const response = await axios.get('/api/analysis');
+                    this.departments = response.data.data;
+                    this.$nextTick(() => {
+                        this.initCharts();
+                    });
+                } catch (error) {
+                    console.error('加载部门薪资数据失败:', error);
+                    // 🆕 改进错误处理，显示用户友好提示
+                    if (error.response && error.response.status === 401) {
+                        alert('登录已过期，请重新登录');
+                        auth.logout();
+                    } else {
+                        alert('加载数据失败，请检查网络连接');
+                    }
+                } finally {
+                    this.loading = false;
+                }
+            },
+            async selectDepartment(dept) {
+                try {
+                    const response = await axios.get(`/api/analysis/${dept.deptId}`);
+                    this.selectedDept = response.data.data;
+                    this.$nextTick(() => {
+                        this.initDetailChart();
+                    });
+                } catch (error) {
+                    console.error('加载部门详情失败:', error);
+                    if (error.response && error.response.status === 401) {
+                        alert('登录已过期，请重新登录');
+                        auth.logout();
+                    } else {
+                        alert('加载部门详情失败');
+                    }
+                }
+            },
+            formatCurrency(value) {
+                if (!value) return '¥0';
+                return '¥' + Number(value).toLocaleString('zh-CN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            },
+            getSalaryRatio(count, total) {
+                if (!total) return 0;
+                return ((count / total) * 100).toFixed(1);
+            },
+            getProgressBarClass(range) {
+                const classes = {
+                    '低薪资 (<5,000)': 'bg-danger',
+                    '中等薪资 (5,000-9,999)': 'bg-warning',
+                    '高薪资 (10,000-19,999)': 'bg-info',
+                    '极高薪资 (≥20,000)': 'bg-success'
+                };
+                return classes[range] || 'bg-primary';
+            },
+            initCharts() {
+                // 销毁现有图表
+                if (this.salaryChart) this.salaryChart.destroy();
+                if (this.employeeChart) this.employeeChart.destroy();
+
+                // 薪资对比图表
+                const salaryCtx = document.getElementById('salaryChart').getContext('2d');
+                this.salaryChart = new Chart(salaryCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: this.departments.map(d => d.deptName),
+                        datasets: [{
+                            label: '平均薪资',
+                            data: this.departments.map(d => d.avgSalary),
+                            backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        return `平均薪资: ${this.formatCurrency(context.raw)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: (value) => '¥' + value.toLocaleString()
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 员工数量图表
+                const employeeCtx = document.getElementById('employeeChart').getContext('2d');
+                this.employeeChart = new Chart(employeeCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: this.departments.map(d => d.deptName),
+                        datasets: [{
+                            data: this.departments.map(d => d.employeeCount),
+                            backgroundColor: [
+                                'rgba(52, 152, 219, 0.7)',
+                                'rgba(46, 204, 113, 0.7)',
+                                'rgba(155, 89, 182, 0.7)',
+                                'rgba(241, 196, 15, 0.7)',
+                                'rgba(230, 126, 34, 0.7)',
+                                'rgba(231, 76, 60, 0.7)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+            },
+            initDetailChart() {
+                if (this.detailChart) this.detailChart.destroy();
+
+                const detailCtx = document.getElementById('detailChart').getContext('2d');
+                this.detailChart = new Chart(detailCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(this.salaryRanges),
+                        datasets: [{
+                            data: Object.values(this.salaryRanges),
+                            backgroundColor: [
+                                'rgba(231, 76, 60, 0.7)',   // 红色 - 低薪资
+                                'rgba(241, 196, 15, 0.7)',  // 黄色 - 中等薪资
+                                'rgba(52, 152, 219, 0.7)',  // 蓝色 - 高薪资
+                                'rgba(46, 204, 113, 0.7)'   // 绿色 - 极高薪资
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const total = this.selectedDept.employeeCount;
+                                        const percentage = ((context.raw / total) * 100).toFixed(1);
+                                        return `${context.label}: ${context.raw}人 (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
