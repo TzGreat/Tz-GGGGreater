@@ -57,3 +57,18 @@ Thumbs.db
 # 敏感配置文件（如果你的application.properties里有真实数据库密码，一定要加上这行）
 # src/main/resources/application.properties
 # 可以保留一个模板文件，比如application.properties.example，不带真实密码
+
+# 必须忽略的文件夹
+node_modules/
+target/
+.idea/
+*.iml
+
+# 其他无用文件
+*.log
+*.class
+.DS_Store
+Thumbs.db
+
+# 敏感配置文件
+demo/src/main/resources/application.properties
